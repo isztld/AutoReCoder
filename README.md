@@ -75,6 +75,15 @@ cd ../..
 
 ## Quickstart
 
+### 0. Clone the repository
+
+```bash
+git clone --recurse-submodules https://github.com/isztld/AutoReCoder.git
+cd AutoReCoder
+```
+
+The `--recurse-submodules` flag is required to pull in `vendor/c2rust`.
+
 ### 1. Prepare your C source
 
 Copy your C/C++ source into `workspace/original/`. You must also write a **driver** — a small
@@ -116,8 +125,15 @@ uv run oracle.py   # verify: pass_rate: 1.000
 
 ### 3. Run the migration agent
 
-Open the repo in [Claude Code](https://claude.ai/code) (or any LLM that reads `CLAUDE.md`)
-and start a session. The agent will:
+Open the repo in [Claude Code](https://claude.ai/code) and use this prompt to start:
+
+```
+Read program.md and run the migration agent loop. Start from setup verification,
+then run experiments continuously. Log every result to results/results.tsv.
+```
+
+Claude Code automatically loads `CLAUDE.md` as its system context, so all constraints
+and output formats are already in place. The agent will:
 
 1. Call `uv run oracle.py --list-targets` to rank unsafe functions
 2. Edit `workspace/src/` — one function per experiment
@@ -125,6 +141,11 @@ and start a session. The agent will:
 4. Keep the commit if both metrics are satisfied; otherwise `git reset --hard HEAD~1`
 5. Log every attempt to `results/results.tsv` and update `patterns/patterns.md`
 6. Repeat until `unsafe_count == 0` or you halt it
+
+To watch progress in real time:
+```bash
+tail -f results/results.tsv
+```
 
 You can also run experiments manually — the oracle and git loop work the same way.
 
