@@ -60,19 +60,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-**Build c2rust** (required once, takes 20–40 minutes):
-
-```bash
-git submodule update --init --recursive
-cd vendor/c2rust
-LLVM_CONFIG_PATH=/opt/homebrew/opt/llvm@16/bin/llvm-config \
-  cargo +nightly-2022-08-08 build --release -p c2rust
-cd ../..
-```
-
-> The `-p c2rust` flag skips `c2rust-refactor`, which requires additional Python 2 code
-> generation scripts and is not needed for transpilation.
-
 ## Quickstart
 
 ### 0. Clone the repository
@@ -84,7 +71,19 @@ cd AutoReCoder
 
 The `--recurse-submodules` flag is required to pull in `vendor/c2rust`.
 
-### 1. Prepare your C source
+### 1. Build c2rust (required once, takes 20–40 minutes)
+
+```bash
+cd vendor/c2rust
+LLVM_CONFIG_PATH=/opt/homebrew/opt/llvm@16/bin/llvm-config \
+  cargo +nightly-2022-08-08 build --release -p c2rust
+cd ../..
+```
+
+> The `-p c2rust` flag skips `c2rust-refactor`, which requires additional Python 2 code
+> generation scripts and is not needed for transpilation.
+
+### 2. Prepare your C source
 
 Copy your C/C++ source into `workspace/original/`. You must also write a **driver** — a small
 program that reads from stdin, calls your library's main entry point, and writes to stdout.
@@ -93,7 +92,7 @@ This is what the oracle fuzzes and diffs against the Rust translation.
 `workspace/original/` contains a ready-to-use example: [miniz](https://github.com/richgel999/miniz)
 (a single-file zlib implementation) with a compress/decompress round-trip driver.
 
-### 2. Run bootstrap (once per codebase)
+### 3. Run bootstrap (once per codebase)
 
 ```bash
 uv run bootstrap/bootstrap.py
@@ -123,7 +122,7 @@ uv run oracle.py   # verify: pass_rate: 1.000
 > `workspace/corpus/` is in `.gitignore` by design — corpus inputs are binary files that
 > bloat the repository. They live only on the machine running the migration.
 
-### 3. Run the migration agent
+### 4. Run the migration agent
 
 Open the repo in [Claude Code](https://claude.ai/code) and use this prompt to start:
 
