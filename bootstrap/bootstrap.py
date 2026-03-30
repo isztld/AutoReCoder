@@ -10,8 +10,8 @@ Usage:
     uv run bootstrap/bootstrap.py [--src workspace/original] [--n-corpus 500]
 
 After successful bootstrap:
-    git add workspace/src/ workspace/corpus/ workspace/callgraph.json
-    git commit -m "bootstrap: c2rust baseline + oracle corpus"
+    git add workspace/src/ workspace/callgraph.json
+    git commit -m "bootstrap: c2rust baseline"
     git tag baseline
 
 Output:
@@ -713,8 +713,8 @@ def main():
     ok(f"Bootstrap complete. Starting unsafe_count: {unsafe_count}")
     print()
     print("Next steps:")
-    print("  git add workspace/src/ workspace/corpus/ workspace/callgraph.json")
-    print('  git commit -m "bootstrap: c2rust baseline + oracle corpus"')
+    print("  git add workspace/src/ workspace/callgraph.json")
+    print('  git commit -m "bootstrap: c2rust baseline"')
     print("  git tag baseline")
     print("  uv run oracle.py   # verify oracle output")
     print("=" * 60)

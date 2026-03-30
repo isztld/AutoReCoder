@@ -19,7 +19,10 @@ workspace/build/
 # Generated at runtime
 run.log
 
-workspace/callgraph.json
+# Corpus inputs are binary files — local only, do not commit
+workspace/corpus/*
+!workspace/corpus/.gitkeep
+
 workspace/original/autorecoder_target
 workspace/original/compile_commands.json
 
