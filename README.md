@@ -71,7 +71,7 @@ cd AutoReCoder
 
 The `--recurse-submodules` flag is required to pull in `vendor/c2rust`.
 
-### 1. Build c2rust (required once, takes 20–40 minutes)
+### 1. Build c2rust (required once)
 
 ```bash
 cd vendor/c2rust
