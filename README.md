@@ -3,8 +3,8 @@
 Autonomous C/C++ → Rust code migration system.
 
 AutoReCoder takes a C codebase, produces a provably-correct (but fully unsafe) Rust translation
-via [c2rust](https://github.com/immunant/c2rust), then runs an agent loop that incrementally
-removes `unsafe` blocks — one function at a time — without ever breaking correctness.
+via [c2rust](https://github.com/immunant/c2rust), then runs an agent loop that **incrementally
+removes** `unsafe` blocks — one function at a time — without ever breaking correctness.
 
 ## How It Works
 
