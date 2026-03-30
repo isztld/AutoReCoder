@@ -1,122 +1,121 @@
-# AutoReCoder — Session Guide
+# AutoReCoder — Agent Instructions
 
-## What This Project Is
+This file is read automatically by Claude Code. It defines the rules and context
+for the autonomous C→Rust migration agent.
 
-AutoReCoder is an autonomous C/C++ → Rust code migration system inspired by the autoresearch framework.
-It runs an agent loop that iteratively improves a Rust translation of a C codebase, guided by a
-locked oracle that measures correctness and memory safety progress.
+---
 
-The core insight: instead of translating C to Rust in one shot (which fails for large, complex code),
-we start from a provably working but fully-unsafe Rust translation (`c2rust` output), then
-autonomously and incrementally make it safe — one function at a time — never breaking correctness.
+## What You Are Doing
 
-## The Three Core Files (mirrors autoresearch)
+You are an autonomous migration agent. Your job is to reduce the number of `unsafe`
+blocks in `workspace/src/` while keeping `pass_rate` at exactly 1.000 as measured
+by `oracle.py`. You run continuously without stopping.
+
+## The Three Core Files
 
 | File | Role | Mutable? |
 |---|---|---|
-| `oracle.py` | Locked evaluation engine. Returns `(pass_rate, unsafe_count)`. | **Never** |
-| `workspace/src/` | The migrated Rust code being iteratively improved. | **Agent only** |
-| `program.md` | Migration directives — the human interface. | **Human only** |
-
-`oracle.py` is the equivalent of autoresearch's `prepare.py`. The agent MUST NOT modify it.
-The agent MUST NOT add new dependencies to `Cargo.toml` beyond what `bootstrap.py` initialized.
+| `oracle.py` | Locked evaluation engine | **Never** |
+| `workspace/src/` | Migrated Rust code | **You only** |
+| `program.md` | Migration directives | **Human only** |
 
 ## The Two Metrics
 
-- **`pass_rate`** — fraction of oracle corpus inputs that produce identical output between the
-  original C binary and the current Rust binary. This is a **hard constraint**: it must not drop.
-- **`unsafe_count`** — number of `unsafe` blocks/functions in `workspace/src/`. This is the
-  **optimization target**: minimize it while `pass_rate` remains at 1.0.
+- **`pass_rate`** — hard constraint. Must stay at 1.000. The Rust binary must produce
+  identical output to the original C binary on every corpus input.
+- **`unsafe_count`** — optimization target. Minimize while `pass_rate` stays at 1.000.
 
-## How a Migration Session Works
+## Session Workflow
 
-### One-time setup (per new codebase)
+### One-time setup
 ```bash
-# 1. Copy target C/C++ source into workspace/original/
-# 2. Run bootstrap to: invoke c2rust, build oracle corpus, compile binaries
-uv run bootstrap/bootstrap.py
-
-# 3. Verify oracle works on the c2rust baseline
-uv run oracle.py
+# Put your C/C++ source in workspace/original/ with a driver.c
+uv run bootstrap/bootstrap.py   # generates workspace/src/ and workspace/corpus/
+uv run oracle.py                # verify: pass_rate: 1.000
 ```
 
-### The experiment loop (run autonomously via program.md)
+### The experiment loop (autonomous)
 ```
-1. Pick function in workspace/src/ with highest unsafe density
-2. Propose a safe Rust equivalent (guided by patterns/patterns.md)
-3. Edit workspace/src/
-4. git commit
-5. Run: uv run oracle.py > run.log
-6. Parse run.log → extract pass_rate, unsafe_count
-7. If pass_rate == 1.0 AND unsafe_count decreased:
-      log to results/results.tsv (status: keep)
-      update patterns/patterns.md with what worked
-   Else:
-      log to results/results.tsv (status: discard)
-      git reset --hard HEAD~1
-8. Repeat — NEVER STOP until unsafe_count == 0 or human halts
+1. Run: uv run oracle.py --list-targets   → pick highest-priority function
+2. Read the function, identify the unsafe pattern
+3. Consult patterns/patterns.md for known approaches
+4. Edit workspace/src/ — one function per experiment
+5. git add workspace/src/ && git commit -m "experiment: <fn> — <approach>"
+6. uv run oracle.py > run.log
+7. Parse run.log:
+     pass_rate == 1.000 AND unsafe_count decreased?
+       YES → keep (commit stays), log to results.tsv, update patterns.md
+       NO  → git reset --hard HEAD~1, log to results.tsv, try different approach
+8. Repeat from step 1. Never stop.
 ```
 
-## Project Layout
+## What You May Modify
 
-```
-autorecoder/
-├── CLAUDE.md              ← This file
-├── PLAN.md                ← Phased implementation plan
-├── program.md             ← Migration directives (human-written per session)
-├── pyproject.toml         ← Python dependencies
-│
-├── oracle.py              ← LOCKED evaluation engine
-├── bootstrap/
-│   └── bootstrap.py       ← One-time setup: c2rust + corpus generation
-│
-├── patterns/
-│   └── patterns.md        ← Agent-maintained pattern library (grows over time)
-│
-├── results/
-│   └── results.tsv        ← Experiment log (generated at runtime)
-│
-├── analysis/
-│   └── analysis.ipynb     ← Progress visualization
-│
-├── vendor/
-│   └── c2rust/            ← git submodule: immunant/c2rust
-│
-└── workspace/             ← Per-migration working area
-    ├── original/          ← Original C/C++ source (copied in by human)
-    ├── corpus/            ← Locked test corpus (generated by bootstrap, never touched)
-    └── src/               ← Migrated Rust code (AGENT MODIFIES THIS)
-```
+| Path | Allowed? |
+|---|---|
+| `workspace/src/**/*.rs` | YES |
+| `patterns/patterns.md` | YES |
+| `results/results.tsv` | YES (append only) |
+| `oracle.py` | **NEVER** |
+| `bootstrap/bootstrap.py` | **NEVER** |
+| `workspace/corpus/` | **NEVER** |
+| `Cargo.toml` | Only with human approval |
 
-## Key Constraints the Agent Must Follow
+## Key Constraints
 
-1. Only modify files under `workspace/src/` and `patterns/patterns.md`
-2. Never modify `oracle.py`, `bootstrap/bootstrap.py`, or `workspace/corpus/`
-3. Never add crates to `Cargo.toml` that could mask unsafe behavior (e.g., no raw FFI crates)
-4. Every experiment must end with a git commit (keep) or git reset (discard)
-5. Log every experiment to `results/results.tsv` — even failures
-6. If `rustc` refuses to compile: log as `compile_fail`, revert, try a different approach
-7. `workspace/corpus/` is sacred — generated once by bootstrap, never regenerated mid-session
+1. One function per experiment — keep diffs small and reviewable
+2. Never add `unsafe` blocks that weren't there before — that's backward progress
+3. Never use `std::mem::transmute` as a workaround
+4. `workspace/corpus/` is sacred — generated once by bootstrap, never regenerated
+5. Every experiment must end with either a commit (keep) or `git reset --hard HEAD~1`
+6. Log every experiment to `results/results.tsv` — even compile failures
 
 ## Rust Compiler Error Codes as Signal
 
-Non-compiling attempts are NOT dead ends. `rustc` error codes give structured signal:
-- `E0502` / `E0503` / `E0505` — borrow conflicts → try reborrow, split scope, or introduce owned copy
-- `E0382` — use after move → try `Clone`, reference, or restructure lifetime
-- `E0499` — multiple mutable borrows → try `RefCell`, restructure loop, or split data
-- `E0716` — temporary dropped too early → bind to named variable
+Compile failures are not dead ends — `rustc` tells you exactly what's wrong:
 
-The agent should record which error codes appeared and what resolution worked in `patterns.md`.
+| Error | Meaning | Resolution |
+|---|---|---|
+| `E0502` / `E0503` / `E0505` | Borrow conflict | Split scope, reborrow, or owned copy |
+| `E0382` | Use after move | `.clone()`, use reference, or restructure |
+| `E0499` | Multiple mutable borrows | `RefCell`, split data, restructure loop |
+| `E0716` | Temporary dropped too early | Bind to named `let` variable |
+| `E0308` | Type mismatch | Check pointer/slice confusion |
 
-## Results TSV Format
+After 3 consecutive failures on the same function: skip it, mark `[DEFERRED]` in patterns.md.
 
+## results.tsv Format
+
+Tab-separated, one row per experiment:
 ```
-commit_hash \t pass_rate \t unsafe_before \t unsafe_after \t compile_status \t function_name \t pattern_used \t description
+commit_hash  pass_rate  unsafe_before  unsafe_after  compile_status  function_name  pattern_used  description
 ```
 
-## Dependency Notes
+Use `"reverted"` as commit_hash for discarded experiments.
 
-- `c2rust` is a git submodule at `vendor/c2rust/` — build it once with `cargo build --release`
-- Python orchestration uses `uv` (same as autoresearch)
-- Fuzzing corpus generation uses `radamsa` (install separately) or the built-in simple fuzzer
-- Miri for UB detection in remaining unsafe: `rustup component add miri`
+## Irreducible Unsafe
+
+Some unsafe cannot be eliminated — mark with a comment and skip:
+```rust
+// IRREDUCIBLE UNSAFE: FFI boundary — called from C code
+// IRREDUCIBLE UNSAFE: hardware interface — mmap/ioctl
+// IRREDUCIBLE UNSAFE: inline assembly
+```
+
+These do not count against the goal.
+
+## Done Condition
+
+Stop when:
+- `unsafe_count == 0` — full migration achieved, or
+- All remaining unsafe is marked `IRREDUCIBLE UNSAFE`, or
+- Human halts the session
+
+Print a summary when done:
+```
+Migration complete.
+Starting unsafe_count: <N>
+Final unsafe_count:    <M>
+Irreducible unsafe:    <K>
+Total experiments:     <T>  (kept: <K1>, discarded: <K2>, compile failures: <K3>)
+```
