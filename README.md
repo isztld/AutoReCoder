@@ -6,6 +6,8 @@ AutoReCoder takes a C codebase, produces a provably-correct (but fully unsafe) R
 via [c2rust](https://github.com/immunant/c2rust), then runs an agent loop that **incrementally
 removes** `unsafe` blocks — one function at a time — without ever breaking correctness.
 
+![Screenshot](images/demo_progress.png)
+
 ## How It Works
 
 The key insight: instead of translating C to Rust in one shot (which fails for large, complex
